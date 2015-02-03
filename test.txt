@@ -1,3 +1,0 @@
-Kan det gå att spara från terminalen tro?
-
-Nu vill Erik se hur det ser ut när man comittar ändringar.
