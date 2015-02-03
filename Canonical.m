@@ -9,8 +9,8 @@ sigma=ones(nbrOfRuns,slutM);
 kvot=0.46;
 counter=0;
 lambda=1.5;
-price=ones(nbrOfTimeSteps+1,1);
-
+price=ones(nbrOfTimeSteps+1,1)*1000;
+priceIncr=zeros(nbrOfTimeSteps,1);
 
 for memory = 2:slutM
     
@@ -32,25 +32,17 @@ for memory = 2:slutM
         
         for timeStep = 1:nbrOfTimeSteps
             actions = zeros(nbrOfAgents,1); 
-            %storeIndex=zeros(nbrOfAgents,s);
-            tmpStrategies = [];
-            histIndex=-1;
-            
-            %for j=1:size(possibleOutcomes,1)
-             %   if isequal(possibleOutcomes(j,:),history)
-                    histIndex = bi2de(history)+1;
-              %      break
-               % end
-            %end
+          
+            histIndex = bi2de(history)+1;
+         
             
             for i=1:nbrOfAgents  % Which will go
-                %Per ska ändra till generella stratIndex
-                
-                if max(points(i,:))>kvot*timeStep
-                    
-                  
+                               
+                if max(points(i,:))>0
+                                      
                     [Value,stratIndex] = max(points(i,:),[],2);
                     maxIndex = find(points(i,:)==Value);
+                    
                     if(length(maxIndex)>1)
                         stratIndex = maxIndex(floor(rand*length(maxIndex))+1);
                     end
@@ -63,35 +55,39 @@ for memory = 2:slutM
                 
             end
             
-            if sum(actions)==0
-            counter=counter+1;
-            end
-            
-            
-            
             minority=-sign(sum(actions));
-            price(timeStep+1)=price(timeStep)*exp(sum(actions)/lambda);
             
-            for i=1:nbrOfAgents %Update score
+%           %Prisättning med log            
+%             price(timeStep+1)=price(timeStep)*exp(sum(actions)/lambda);
+%             priceIncr(timeStep)=exp(sum(actions)/lambda);
+              
                 
-                for j=1:s %for each strategy
-                      points(i,j) = points(i,j) + (agents(i,histIndex,j)== minority);
+          %Ren skillnad mellan köp och sälj
+            price(timeStep+1)=price(timeStep)+sum(actions);
+            %priceIncr(timeStep)=sum(actions);
+
+            
+              for i=1:nbrOfAgents %Update score
+                  
+                  for j=1:s %for each strategy
+                      points(i,j) = points(i,j) + agents(i,histIndex,j)*minority;
                       %points(i,j) = points(i,j) + agents(i,histIndex,j)*minority;
-                end                           
-                
-                               
-            end
-            
+                  end
+              end
+              
             storeMinorityGroup(timeStep)=sum(actions==minority);
             
             storeAttendance(timeStep) = sum(abs(actions)); %Hur många
             %som gör något.
             
             if minority==-1
-            history = [history(2:end) 0]; % Update history
+                history = [history(2:end) 0]; % Update history
             
+            elseif minority==0 
+                history =binornd(1,0.5,1,memory);
+                    
             else
-            history = [history(2:end) 1]; % Update history
+                history = [history(2:end) 1]; % Update history
             end
 
             
@@ -107,31 +103,45 @@ for memory = 2:slutM
 end     %memory
 
 %%
-clf
-figure(2)
 
-subplot(3,1,1)
+figure(1)
+clf
+subplot(2,1,1)
 title('Size of Minority Group')
 hold on
 plot(storeMinorityGroup)
 axis([0 nbrOfTimeSteps 0 nbrOfAgents/2+5])
 
-subplot(3,1,2)
+subplot(2,1,2)
 title('Participants')
 hold on
 plot(storeAttendance)
 axis([0 nbrOfTimeSteps 0 nbrOfAgents+5])
 
+%Log-return av pris
+
+dt=20;
+for i=1+dt:nbrOfTimeSteps
+   logReturn(i)=log(price(i)/price(i-dt));
+end
+
+figure(2)
+clf
+subplot(2,1,1)
+title('logReturn')
+hold on
+plot(logReturn)
+subplot(2,1,2)
+hold on
+title('Fördelning av prisökn')
+hist(logReturn,100)
+
 figure(3)
 clf
-title('log(Price)')
-%hold on
-semilogy(price)
+qqplot(logReturn)
 
 
 
-
-frequency=counter/nbrOfTimeSteps;
 
 
 
