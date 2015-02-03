@@ -8,6 +8,8 @@ nbrOfRuns = 1;
 sigma=ones(nbrOfRuns,slutM);
 kvot=0.46;
 counter=0;
+lambda=1.5;
+price=ones(nbrOfTimeSteps+1,1);
 
 
 for memory = 2:slutM
@@ -66,15 +68,17 @@ for memory = 2:slutM
             end
             
             
-            %minority = -mode(attendance(find(attendance~=0)));
+            
             minority=-sign(sum(actions));
+            price(timeStep+1)=price(timeStep)*exp(sum(actions)/lambda);
             
             for i=1:nbrOfAgents %Update score
-                %tmpStrategies = agents(i).strategies;
+                
                 for j=1:s %for each strategy
-                    %points(i,j) = points(i,j) + (tmpStrategies(histIndex,j) == minority);
-                    points(i,j) = points(i,j) + (agents(i,histIndex,j)== minority);
-                end                            
+                      points(i,j) = points(i,j) + (agents(i,histIndex,j)== minority);
+                      %points(i,j) = points(i,j) + agents(i,histIndex,j)*minority;
+                end                           
+                
                                
             end
             
@@ -102,28 +106,35 @@ for memory = 2:slutM
     
 end     %memory
 
-
+%%
 clf
 figure(2)
 
-subplot(2,1,1)
+subplot(3,1,1)
 title('Size of Minority Group')
 hold on
 plot(storeMinorityGroup)
 axis([0 nbrOfTimeSteps 0 nbrOfAgents/2+5])
 
-subplot(2,1,2)
+subplot(3,1,2)
 title('Participants')
 hold on
 plot(storeAttendance)
 axis([0 nbrOfTimeSteps 0 nbrOfAgents+5])
 
+figure(3)
+clf
+title('log(Price)')
+%hold on
+semilogy(price)
 
 
-frequency=counter/nbrOfTimeSteps
 
 
-%plot(storeActiveAgents)
+frequency=counter/nbrOfTimeSteps;
+
+
+
 
 %%
 clf
