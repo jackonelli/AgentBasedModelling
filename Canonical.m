@@ -1,118 +1,132 @@
-clear all
+%% Main-fil för simulering
+% /Users/jakoblindqvist/GitHub/AgentBasedModeling
 
-nbrOfAgents = 1500;
-nbrOfStrategies = 2; %Number of Strategies
-slutM=4; %Largest memory
-nbrOfTimeSteps = 12000; %Time steps of one game
-nbrOfRuns = 1; %Number of runs with each setup
-epsilon=0.1; %Tradingfee
-lambda=1;%A strange parameter, something with liquidity
-partProducer=0.667; %Ratio of producer/nbrOfAgents
+%%
+tic
+nbrOfAgents = 501;
+nbrOfStrategies = 2;    %Number of Strategies
+%Largest memory
+nbrOfTimeSteps = 10000; %Time steps of one game
+nbrOfRuns = 4;          %Number of runs with each setup
+epsilon=0.1;          %Tradingfee
+lambda=1;               %A strange parameter, something with liquidity
+partProducer=0.5;     %Ratio of producer/nbrOfAgents
 
 Prod=floor(partProducer*nbrOfAgents); %Number of Producers
-
+memory=4;
 
 %Pre-allocating some measured quantities
-sigma=ones(nbrOfRuns,slutM);
 price=ones(nbrOfTimeSteps+1,1)*1000;
 priceIncr=zeros(nbrOfTimeSteps,1);
 stratCompare=zeros(nbrOfTimeSteps,2);
 
-for memory = slutM:slutM
-            P=2^memory;
-    % Run simulation
-    %according to "Black-Scholes to MG" GCMG depends on an alpha_c for both 
-    %Producers and speculators.
+
+
+% Run simulation
+%according to "Black-Scholes to MG" GCMG depends on an alpha_c for both
+%Producers and speculators.
+P=2^memory;
+AProd=sum(ones(Prod,2^memory) - floor(rand(Prod,2^memory)*2)*2);
+%Correct stat. distr. but not code efficient
+activeSpec = zeros(nbrOfTimeSteps,nbrOfRuns); %Resetting
+
+A = zeros(nbrOfTimeSteps,1);
+actions = zeros(nbrOfAgents-Prod,1);%Resetting
+
+for iRun=1:nbrOfRuns
     
-    for iRun = nbrOfRuns:nbrOfRuns
-        
-        agents = CanonicalAgents(nbrOfAgents,memory,nbrOfStrategies); %Creates a number
-        %of agents which consists of 3 indices with (whichAgents,Matrix with strategy outcomes (2^m,s))
-        
-        points = (epsilon+1)*ones(nbrOfAgents, nbrOfStrategies); %A separate matrix which
-        %corresponds to the agents' matrix
-        
-        storeMinorityGroup = zeros(nbrOfTimeSteps,1);
-        storeAttendance = zeros(nbrOfTimeSteps,1); %Resetting
-        
-        for timeStep = 1:nbrOfTimeSteps
-            
-            actions = zeros(nbrOfAgents,1);%Resetting
-            
-            histIndex = randi(2^memory,1,1);%Rand one of the 2^memory stra
-            %tegies
-            
-            
-            % Which will go
-            %Selects the choice perscribed by the at this point most
-            %succesful strategy. If there is more than one at the top
-            %a coin toss decides the outcome.
-            %With a possibility to abstained if the threshold of a
-            %stratey is not met.
-            
-            %This could be modified with one loop and different epsilon
-            %instead.
-            for i=1:Prod
-                
-                actions(i)=agents(i,histIndex,1);
-            end
-            %Perhaps no coin toss if two strategies are equally good
-            %instead always choose the same one.
-            %Would make analysis easier and irrational agents (such)
-            %as ours are likely to act on a hunch.
-            for i=Prod+1:nbrOfAgents
-                if max(points(i,:))>0
-                    
-                    [Value,stratIndex] = max(points(i,:),[],2);
-                    maxIndex = find(points(i,:)==Value);
-                    
-                    if(length(maxIndex)>1)
-                        stratIndex = maxIndex(floor(rand*length(maxIndex))+1);
-                    end
-                    
-                    actions(i)=agents(i,histIndex,stratIndex);
-                    
-                else
-                    actions(i)=0;
-                end
-                
-            end
-            
-            
-            minority=-sign(sum(actions));
-            
-            %           %Prisättning med log
-            %             price(timeStep+1)=price(timeStep)*exp(sum(actions)/lambda);
-            %             priceIncr(timeStep)=exp(sum(actions)/lambda);
-            
-            
-            %Difference of sum actions determines the price increase.
-            price(timeStep+1)=price(timeStep)*exp(sum(actions)/sum(abs(actions)));
-            %priceIncr(timeStep)=sum(actions);
-            
-            
-            for i=1:nbrOfAgents %Update score
-                
-                for j=1:nbrOfStrategies %for each strategy
-                    points(i,j) = points(i,j) - agents(i,histIndex,j)*sum(actions)/P-epsilon/P;
-                    %points(i,j) = points(i,j) + agents(i,histIndex,j)*minority;
-                    
-                end
-            end
-            stratCompare(timeStep,:)=points(nbrOfAgents,:);            
-            
-            storeAttendance(timeStep) = sum(abs(actions)); %Number of agents
-            %that doesn't abstain.
-            
-                     
-        end %timestep
-        %Store the measure of standard deviation.
-        sigma(iRun,memory)=std(storeMinorityGroup);
+    agents = CanonicalAgents(nbrOfAgents-Prod,memory,nbrOfStrategies); %Creates a number
+    %of agents which consists of 3 indices with (whichAgents,Matrix with strategy outcomes (2^m,s))
+    points = (epsilon)*ones(nbrOfAgents-Prod, nbrOfStrategies); %A separate matrix which
+    %corresponds to the agents' matrix
+    clear temp1; clear tempStrat; clear temp;
+    %rr = randi(2,nbrOfAgents-Prod,nbrOfTimeSteps);
+    for timeStep = 1:nbrOfTimeSteps
         
         
-    end % End of Runs
         
-end     %End memory
+        histIndex = randi(2^memory,1,1);%Rand one of the 2^memory histories
+        
+        %**********************
+        % WHICH AGENTS WILL GO
+        %**********************
+        
+        %Selects the choice perscribed by the at this point most
+        %succesful strategy. If there is more than one at the top
+        %a coin toss decides the outcome.
+        %With a possibility to abstained if the threshold of a
+        %strategy is not met.
+        
+        
+        [Value,stratIndex] = max(points,[],2); %Pick most success-
+        %                 %full strategy and it's corresp. point.
+        tempStrat(:,:)=agents(:,histIndex,:); %Intermediate step
+        %                 %because Matlab doeesn't do 3D-matrices well
+        
+        
+        
+        % actions=tempStrat(stratIndex).*Value>0;%
+        %Jakobs finlösning: fungerar ej
+        
+        
+        
+        ind=find(points(:,1)==points(:,2));
+        temp2=tempStrat(:,1).*(stratIndex==1)+tempStrat(:,2).*(stratIndex==2);
+        temp2(ind)=ones(length(ind),1)-floor(rand(length(ind),1)*2)*2;
+        %notEqual = points(:,1)~=points(:,2);
+        %r = randi(2,nbrOfAgents-Prod,1);
+        %r= rr(:,timeStep);
+        %temp2 = (tempStrat(:,1).*(stratIndex==1) + tempStrat(:,2).*(stratIndex==2)).*notEqual +...
+           % (ones(size(points,1),1)-notEqual).*(tempStrat(:,1).*(r==1) + tempStrat(:,2).*(r==2));
+        
+        actions=temp2.*(Value>0);
+        %Samuels fullösning: FUNGERAR.
+        
+        %Stores the actual
+        %choice of all speculators.
+        
+        
+        %(This could be modified with one loop and different epsilon
+        %instead.
+        
+        %Perhaps no coin toss if two strategies are equally good
+        %instead always choose the same one.
+        %Would make analysis easier and irrational agents (such)
+        %as ours are likely to act on a hunch.)
+        
+        %**************
+        %STORE RESULTS
+        %**************
+        
+        A(timeStep)=sum(actions)+AProd(histIndex);
+        activeSpec(timeStep,iRun)=sum(abs(actions));
+        %*************
+        % UPDATE SCORE
+        %**************
+        
+        points = points - tempStrat*A(timeStep)/P-epsilon/P;
+        %points(i,j) = points(i,j) + agents(i,histIndex,j)*minority;
+        
+        
+        
+    end % end timestep
+    
+end %end nbrOfRuns
+toc
+%% Tidtagning
+tidsst=[100 500 1000 5000 10000 20000 40000];
+tid=[0.043 0.14 0.26 1.15 2.3 5.57 9.11];
+figure(1)
+clf
+plot(tidsst,tid)
+
+%%
+figure(1)
+clf
+for i=1:4
+    subplot(2,2,i)
+    plot(activeSpec(:,i))
+end
 
 %% Plottar lite goe grejer
 
@@ -125,16 +139,23 @@ hold on
 %axis([0 nbrOfTimeSteps 0 nbrOfAgents+5])
 activeSpec=storeAttendance-floor(partProducer*nbrOfAgents);
 
-[val ind]=min(activeSpec);
+[val,ind]=min(activeSpec);
 width=1000;
 start=ind-width/2;
 stopp=ind+width/2;
 %plot(activeSpec(start:stopp))
+
 plot(activeSpec)
+
 subplot(2,1,2)
-title('Price (log)')
+hold on
+title('Price')
 % plot(price(start:stopp))
 plot(price)
+
+%% Price
+
+price(timeStep+1)=price(timeStep)*exp(sum(actions)/sum(abs(actions)));
 
 %% Logreturn
 dt=1;
@@ -143,18 +164,18 @@ clear logReturn2
 figure(2)
 clf
 
+
+for i=1+dt:nbrOfTimeSteps
     
-    for i=1+dt:nbrOfTimeSteps
-        
-        logReturn(i)=log(price(i)/price(i-dt));
-        
-    end
-    logReturn2=logReturn(1,(dt+1):end);
- 
+    logReturn(i)=log(price(i)/price(i-dt));
+    
+end
+logReturn2=logReturn(1,(dt+1):end);
 
-plot(logReturn2)
 
-% 
+plot(logReturn2(2000:end))
+
+%
 % for i=1+dt:nbrOfTimeSteps
 % avkast(i)=(price(i)-price(i-dt))/(price(i));
 % end
@@ -165,16 +186,17 @@ clear corr
 maxLag=300;
 corr=autocorr(abs(logReturn2(2000:end)),maxLag);
 corr=corr(2:end)';
-x=1:maxLag;
+
 
 coeff= coeffvalues(fit((1:maxLag)',corr,'Power1'))
 theorCorr=coeff(1)*x.^coeff(2);
 
 figure(3)
 clf
-plot(theorCorr,'--')
 hold on
+plot(theorCorr,'--')
 plot(corr,'o')
+title('Autocorrelated logReturn')
 % Corr is the vector of auto correlations.
 %loglog(corr,'o')
 
@@ -186,9 +208,12 @@ subplot(2,1,1)
 title('logReturn')
 %axis([0,length(logReturn2),-k*max(logReturn2),k*max(logReturn2)])
 hold on
-plot(logReturn2(4000:end))
+plot(logReturn2(2:end))
 
 subplot(2,1,2)
 hold on
 title('Fördelning av prisökning')
-hist(logReturn2(4000:end),20)
+hist(logReturn2(2:end),100)
+
+
+
