@@ -2,50 +2,57 @@
 % /Users/jakoblindqvist/GitHub/AgentBasedModeling
 
 %%
-tic
-nbrOfAgents = 501;
-nbrOfStrategies = 2;    %Number of Strategies
-%Largest memory
-nbrOfTimeSteps = 10000; %Time steps of one game
-nbrOfRuns = 4;          %Number of runs with each setup
-epsilon=0.1;          %Tradingfee
-lambda=1;               %A strange parameter, something with liquidity
-partProducer=0.5;     %Ratio of producer/nbrOfAgents
+clear all
 
-Prod=floor(partProducer*nbrOfAgents); %Number of Producers
+%************
+% PARAMETERS
+%************
+nbrOfAgents = 3015;
+nbrOfStrategies = 2;
+nbrOfTimeSteps = 15000;
+nbrOfRuns = 1;
+epsilon=0.1;          %Tradingfee
+partProducer=0.4;    %Ratio of producer/nbrOfAgents
 memory=4;
 
-%Pre-allocating some measured quantities
+%Secondary parameters
+Prod=floor(partProducer*nbrOfAgents) %Number of Producers
+AProd=sum(ones(Prod,2^memory) - floor(rand(Prod,2^memory)*2)*2);
+%Random contribution to the A(t) variable by the producers Correct stat. 
+%distr. but not code efficient
+
+P=2^memory;
+
+%*********************************
+%PRE-ALLOCATING STORED QUANTITIES
+%*********************************
+
 price=ones(nbrOfTimeSteps+1,1)*1000;
 priceIncr=zeros(nbrOfTimeSteps,1);
 stratCompare=zeros(nbrOfTimeSteps,2);
+activeSpec = zeros(nbrOfTimeSteps,nbrOfRuns);
+A = zeros(nbrOfTimeSteps,nbrOfRuns);
+actions = zeros(nbrOfAgents-Prod,1);
+bestStrat=zeros(nbrOfAgents-Prod,nbrOfTimeSteps);
 
-
-
-% Run simulation
-%according to "Black-Scholes to MG" GCMG depends on an alpha_c for both
-%Producers and speculators.
-P=2^memory;
-AProd=sum(ones(Prod,2^memory) - floor(rand(Prod,2^memory)*2)*2);
-%Correct stat. distr. but not code efficient
-activeSpec = zeros(nbrOfTimeSteps,nbrOfRuns); %Resetting
-
-A = zeros(nbrOfTimeSteps,1);
-actions = zeros(nbrOfAgents-Prod,1);%Resetting
+%****************
+% RUN SIMULATION
+%****************
 
 for iRun=1:nbrOfRuns
     
-    agents = CanonicalAgents(nbrOfAgents-Prod,memory,nbrOfStrategies); %Creates a number
-    %of agents which consists of 3 indices with (whichAgents,Matrix with strategy outcomes (2^m,s))
-    points = (epsilon)*ones(nbrOfAgents-Prod, nbrOfStrategies); %A separate matrix which
-    %corresponds to the agents' matrix
-    clear temp1; clear tempStrat; clear temp;
-    %rr = randi(2,nbrOfAgents-Prod,nbrOfTimeSteps);
+    %Resetting dynamic values
+    agents = CanonicalAgents(nbrOfAgents-Prod,memory,nbrOfStrategies);
+    
+    points = (epsilon)*ones(nbrOfAgents-Prod, nbrOfStrategies);
+    %A separate matrix which corresponds to the agents' matrix
+    
     for timeStep = 1:nbrOfTimeSteps
         
         
         
-        histIndex = randi(2^memory,1,1);%Rand one of the 2^memory histories
+        histIndex = randi(2^memory,1,1);
+        %Rand one of the 2^memory histories
         
         %**********************
         % WHICH AGENTS WILL GO
@@ -54,16 +61,13 @@ for iRun=1:nbrOfRuns
         %Selects the choice perscribed by the at this point most
         %succesful strategy. If there is more than one at the top
         %a coin toss decides the outcome.
-        %With a possibility to abstained if the threshold of a
+        %With a possibility to abstain if the threshold of a
         %strategy is not met.
         
-        
-        [Value,stratIndex] = max(points,[],2); %Pick most success-
-        %                 %full strategy and it's corresp. point.
-        tempStrat(:,:)=agents(:,histIndex,:); %Intermediate step
-        %                 %because Matlab doeesn't do 3D-matrices well
-        
-        
+        [Value,stratIndex] = max(points,[],2);
+        %Pick most successfull strategy and it's corresp. point.
+        tempStrat(:,:)=agents(:,histIndex,:);
+        %Intermediate step because Matlab doeesn't do 3D-matrices well
         
         % actions=tempStrat(stratIndex).*Value>0;%
         %Jakobs finlösning: fungerar ej
@@ -73,22 +77,13 @@ for iRun=1:nbrOfRuns
         ind=find(points(:,1)==points(:,2));
         temp2=tempStrat(:,1).*(stratIndex==1)+tempStrat(:,2).*(stratIndex==2);
         temp2(ind)=ones(length(ind),1)-floor(rand(length(ind),1)*2)*2;
-        %notEqual = points(:,1)~=points(:,2);
-        %r = randi(2,nbrOfAgents-Prod,1);
-        %r= rr(:,timeStep);
-        %temp2 = (tempStrat(:,1).*(stratIndex==1) + tempStrat(:,2).*(stratIndex==2)).*notEqual +...
-           % (ones(size(points,1),1)-notEqual).*(tempStrat(:,1).*(r==1) + tempStrat(:,2).*(r==2));
-        
-        actions=temp2.*(Value>0);
         %Samuels fullösning: FUNGERAR.
         
-        %Stores the actual
-        %choice of all speculators.
-        
+        actions=temp2.*(Value>0);
+        %Stores the actual choice of all speculators.
         
         %(This could be modified with one loop and different epsilon
         %instead.
-        
         %Perhaps no coin toss if two strategies are equally good
         %instead always choose the same one.
         %Would make analysis easier and irrational agents (such)
@@ -98,97 +93,71 @@ for iRun=1:nbrOfRuns
         %STORE RESULTS
         %**************
         
-        A(timeStep)=sum(actions)+AProd(histIndex);
+        A(timeStep,iRun)=sum(actions)+AProd(histIndex);
         activeSpec(timeStep,iRun)=sum(abs(actions));
-        %*************
+        
+        %**************
         % UPDATE SCORE
         %**************
         
         points = points - tempStrat*A(timeStep)/P-epsilon/P;
-        %points(i,j) = points(i,j) + agents(i,histIndex,j)*minority;
-        
-        
+        bestStrat(:,timeStep)=Value;
         
     end % end timestep
-    
-end %end nbrOfRuns
-toc
-%% Tidtagning
-tidsst=[100 500 1000 5000 10000 20000 40000];
-tid=[0.043 0.14 0.26 1.15 2.3 5.57 9.11];
-figure(1)
-clf
-plot(tidsst,tid)
+end
+%% **************
+%  BEST STRATEGY
+%  **************
 
-%%
-figure(1)
+figure(3)
 clf
-for i=1:4
-    subplot(2,2,i)
-    plot(activeSpec(:,i))
+for a=1:(nbrOfAgents-Prod)
+    hold on
+    plot(bestStrat(a,:))
 end
 
-%% Plottar lite goe grejer
+% *******************
+%PRICE AND LOGRETURNS;
+%  *******************
 
-figure(1)
-clf
+%Calculate price
+price=1000*ones(nbrOfTimeSteps+1,1);
+lambda=1E5;
+for timeStep=1:nbrOfTimeSteps
+    price(timeStep+1)=price(timeStep)*exp(A(timeStep)/lambda);
+end
+
+%Calculate log Returns
+dt=1;
+logReturn=log(price(dt+1:end)./price(1:end-dt));
+
+%plot
+% figure(1)
+% clf
+% hold on
+% title('Price')
+% xlabel('Time')
+% plot(price)
+
+figure(2)
 subplot(2,1,1)
-title('Participants')
-hold on
-%plot(storeAttendance(1:end))
-%axis([0 nbrOfTimeSteps 0 nbrOfAgents+5])
-activeSpec=storeAttendance-floor(partProducer*nbrOfAgents);
-
-[val,ind]=min(activeSpec);
-width=1000;
-start=ind-width/2;
-stopp=ind+width/2;
-%plot(activeSpec(start:stopp))
-
-plot(activeSpec)
+plot(activeSpec(1:end))
+title('')
+%hist(logReturn(1:end),500)
 
 subplot(2,1,2)
-hold on
-title('Price')
-% plot(price(start:stopp))
-plot(price)
-
-%% Price
-
-price(timeStep+1)=price(timeStep)*exp(sum(actions)/sum(abs(actions)));
-
-%% Logreturn
-dt=1;
-clear logReturn
-clear logReturn2
-figure(2)
-clf
-
-
-for i=1+dt:nbrOfTimeSteps
-    
-    logReturn(i)=log(price(i)/price(i-dt));
-    
-end
-logReturn2=logReturn(1,(dt+1):end);
-
-
-plot(logReturn2(2000:end))
-
-%
-% for i=1+dt:nbrOfTimeSteps
-% avkast(i)=(price(i)-price(i-dt))/(price(i));
-% end
-% avkast2=avkast(1,2:end)';
-%
-%% Autocorrelation
+plot(logReturn(1:end))
+title('log Returns')
+%% ****************
+%  Autocorrelation
+%  ****************
 clear corr
 maxLag=300;
-corr=autocorr(abs(logReturn2(2000:end)),maxLag);
-corr=corr(2:end)';
-
+corr=autocorr(abs(logReturn(2000:end)),maxLag);
+corr=corr(2:end);
 
 coeff= coeffvalues(fit((1:maxLag)',corr,'Power1'))
+x=linspace(1,maxLag);
 theorCorr=coeff(1)*x.^coeff(2);
 
 figure(3)
@@ -199,21 +168,6 @@ plot(corr,'o')
 title('Autocorrelated logReturn')
 % Corr is the vector of auto correlations.
 %loglog(corr,'o')
-
-%%
-figure(4)
-clf
-k=1.1;
-subplot(2,1,1)
-title('logReturn')
-%axis([0,length(logReturn2),-k*max(logReturn2),k*max(logReturn2)])
-hold on
-plot(logReturn2(2:end))
-
-subplot(2,1,2)
-hold on
-title('Fördelning av prisökning')
-hist(logReturn2(2:end),100)
 
 
 

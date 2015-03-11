@@ -1,15 +1,15 @@
 clear all
-
+profile on
 diffnbrOfAgents = [11 111 501 1001 2001 5001];
-nbrOfStrategies = 2; %Number of Strategies
-slutM=11; %Largest memory
+nbrOfStrategies =11; %Number of Strategies
+slutM=2; %Largest memory
 nbrOfTimeSteps = 40000; %Time steps of one game
 nbrOfRuns = 4; %Number of runs with each setup
-eps=[0 1/10000 1/1000 1/100 1/10 1]; %Tradingfee
+eps=[0 1/1000 1/100 1/10 1]; %Trading fee
 lambda=1;%A strange parameter, something with liquidity
 %partProducer=[]; %Ratio of producer/nbrOfAgents
 procentProd=[0.01 0.05 0.1 0.2 0.4 0.6 0.8];
- %Number of Producers
+%Number of Producers
 
 
 %Pre-allocating some measured quantities
@@ -18,8 +18,8 @@ price=ones(nbrOfTimeSteps+1,1)*1000;
 priceIncr=zeros(nbrOfTimeSteps,1);
 stratCompare=zeros(nbrOfTimeSteps,2);
 for epsilon=eps
-    for memory = 1:slutM
-        for nbrOfAgents=diffnbrOfAgents
+    for nbrOfAgents=diffnbrOfAgents
+        parfor memory = 1:slutM
             for partProducer=procentProd
                 Prod=floor(partProducer*nbrOfAgents);
                 P=2^memory;
@@ -95,8 +95,9 @@ for epsilon=eps
                         %Difference of sum actions determines the price increase.
                         %price(timeStep+1)=price(timeStep)*exp(sum(actions)/sum(abs(actions)));
                         %priceIncr(timeStep)=sum(actions);
+                        
                         A(timeStep)=sum(actions);
-                        activeSpec(timeStep)=sum(abs(actions))-Prod;
+                        activeSpec(timeStep)=sum(abs(actions))-Prod; 
                         
                         
                         for i=1:nbrOfAgents %Update score
@@ -123,13 +124,14 @@ for epsilon=eps
                     toFileData=[A activeSpec stratProd];
                     fileName=strcat('eps',num2str(epsilon),'mem',num2str(memory),'Ag',num2str(nbrOfAgents),'prod',num2str(partProducer),'run',num2str(iRun),'.txt');%txt or dat?
                     csvwrite(fileName,toFileData)
-                   
+                    
                     
                 end % End of Runs
             end %producer
-        end
-    end     %End memory
+        end  %End Memory
+    end  %End Agents
 end % End epsilon
+profile viewer
 %% Plottar lite goe grejer
 
 figure(1)
@@ -159,18 +161,18 @@ clear logReturn2
 figure(2)
 clf
 
+
+for i=1+dt:nbrOfTimeSteps
     
-    for i=1+dt:nbrOfTimeSteps
-        
-        logReturn(i)=log(price(i)/price(i-dt));
-        
-    end
-    logReturn2=logReturn(1,(dt+1):end);
- 
+    logReturn(i)=log(price(i)/price(i-dt));
+    
+end
+logReturn2=logReturn(1,(dt+1):end);
+
 
 plot(logReturn2)
 
-% 
+%
 % for i=1+dt:nbrOfTimeSteps
 % avkast(i)=(price(i)-price(i-dt))/(price(i));
 % end
