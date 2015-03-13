@@ -4,15 +4,15 @@
 %%
 clear all
 
-%************
+%***********
 % PARAMETERS
-%************
+%***********
 nbrOfAgents = 501;
 nbrOfStrategies = 2;
 nbrOfTimeSteps = 20000;
-nbrOfRuns = 1;
+nbrOfRuns = 4;
 epsilon=0.1;          %Tradingfee
-partProducer=0.2;    %Ratio of producer/nbrOfAgents
+partProducer=0.05;    %Ratio of producer/nbrOfAgents
 memory=4;
 
 %Secondary parameters
@@ -23,9 +23,9 @@ AProd=sum(ones(Prod,2^memory) - floor(rand(Prod,2^memory)*2)*2);
 
 P=2^memory;
 
-%*********************************
+%********************************
 %PRE-ALLOCATING STORED QUANTITIES
-%*********************************
+%********************************
 
 price=ones(nbrOfTimeSteps+1,1)*1000;
 priceIncr=zeros(nbrOfTimeSteps,1);
@@ -35,9 +35,9 @@ A = zeros(nbrOfTimeSteps,nbrOfRuns);
 actions = zeros(nbrOfAgents-Prod,1);
 bestStrat=zeros(nbrOfAgents-Prod,nbrOfTimeSteps);
 
-%****************
+%***************
 % RUN SIMULATION
-%****************
+%***************
 
 for iRun=1:nbrOfRuns
     
@@ -58,9 +58,9 @@ for iRun=1:nbrOfRuns
         
         %Rand one of the 2^memory histories
         
-        %**********************
+        %*********************
         % WHICH AGENTS WILL GO
-        %**********************
+        %*********************
         
         %Selects the choice perscribed by the at this point most
         %succesful strategy. If there is more than one at the top
@@ -109,9 +109,9 @@ for iRun=1:nbrOfRuns
         bestStrat(:,timeStep)=Value;
         
         if A(timeStep,iRun)==0
-        history(timeStep)=randi(2)-1;
+        history(timeStep+memory)=randi(2)-1;
         else
-        history(timeStep)=1==-sign(A(timeStep,iRun));
+        history(timeStep+memory)=1==-sign(A(timeStep,iRun));
         end
         
     end % end timestep
@@ -130,15 +130,14 @@ end
 
 % *******************
 %PRICE AND LOGRETURNS;
-%  *******************
-
+% *******************
+run=1;
 %Calculate price
 price=1000*ones(nbrOfTimeSteps+1,1);
 lambda=1E5;
 for timeStep=1:nbrOfTimeSteps
-    price(timeStep+1)=price(timeStep)*exp(A(timeStep)/lambda);
+    price(timeStep+1)=price(timeStep)*exp(A(timeStep,run)/lambda);
 end
-
 %Calculate log Returns
 dt=1;
 logReturn=log(price(dt+1:end)./price(1:end-dt));
@@ -153,16 +152,16 @@ logReturn=log(price(dt+1:end)./price(1:end-dt));
 
 figure(2)
 subplot(2,1,1)
-plot(activeSpec(1:end))
-title('')
+plot(activeSpec(1:end,run))
+title('Active Speculators')
 %hist(logReturn(1:end),500)
 
 subplot(2,1,2)
 plot(logReturn(1:end))
 title('log Returns')
-%% ****************
+%% ***************
 %  Autocorrelation
-%  ****************
+%  ***************
 clear corr
 maxLag=300;
 corr=autocorr(abs(logReturn(2000:end)),maxLag);
