@@ -47,9 +47,7 @@ for iRun=1:nbrOfRuns
     points = (epsilon)*ones(nbrOfAgents-Prod, nbrOfStrategies);
     %A separate matrix which corresponds to the agents' matrix
     
-    for timeStep = 1:nbrOfTimeSteps
-        
-        
+    for timeStep = 1:nbrOfTimeSteps        
         
         histIndex = randi(2^memory,1,1);
         %Rand one of the 2^memory histories
@@ -105,7 +103,7 @@ for iRun=1:nbrOfRuns
         
     end % end timestep
 end
-%% **************
+% **************
 %  BEST STRATEGY
 %  **************
 
@@ -116,7 +114,7 @@ for a=1:(nbrOfAgents-Prod)
     plot(bestStrat(a,:))
 end
 
-% *******************
+%% % *******************
 %PRICE AND LOGRETURNS;
 %  *******************
 
