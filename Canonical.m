@@ -10,7 +10,7 @@ clear all
 nbrOfAgents = 501;
 nbrOfStrategies = 2;
 nbrOfTimeSteps = 20000;
-nbrOfRuns = 4;
+nbrOfRuns = 1;
 epsilon=0.1;          %Tradingfee
 partProducer=0.05;    %Ratio of producer/nbrOfAgents
 memory=4;
@@ -111,7 +111,7 @@ for iRun=1:nbrOfRuns
         if A(timeStep,iRun)==0
         history(timeStep+memory)=randi(2)-1;
         else
-        history(timeStep+memory)=1==-sign(A(timeStep,iRun));
+        history(timeStep+memory)=(sign(A(timeStep,iRun))==-1);
         end
         
     end % end timestep
