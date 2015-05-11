@@ -1,72 +1,76 @@
 %% Main-fil för simulering
-% /Users/jakoblindqvist/GitHub/AgentBasedModeling
+cd /Users/jakoblindqvist/GitHub/AgentBasedModeling
 
 %%
-
 
 %************
 % PARAMETERS
 %************
-nbrOfAgents = 500;
+nbrOfAgents = 300;
 nbrOfStrategies = 2;
-nbrOfTimeSteps = 100000;
+nbrOfTimeSteps = 20000;
 nbrOfRuns = 1;
-epsilon=0.01;          %Tradingfee
-% partProducer=0.4;    %Ratio of producer/nbrOfAgents
-memory=4;
+epsilon=0.01;
+memory=5;
 
-partProducer=0.3;
+a=1;
 
-
+partProducer=0.05;    %Ratio of producer/nbrOfAgents
 %Alpha_c
-alpa=0;
-sigmaScaled=0;
-phase=5000;
-
-
-%*********************************
-%PRE-ALLOCATING STORED QUANTITIES
-%*********************************
-
-%price=ones(nbrOfTimeSteps+1,1)*1000;
-%priceIncr=zeros(nbrOfTimeSteps,1);
 
 
 %****************
 % RUN SIMULATION
 %****************
 for memory=4:4
-    activeSpec = zeros(nbrOfTimeSteps,nbrOfRuns);
-    actions = zeros(nbrOfAgents-Prod,1);
-    %bestStrat=zeros(nbrOfAgents-Prod,nbrOfTimeSteps);
-    A = zeros(nbrOfTimeSteps,nbrOfRuns);
-    clear agents
-    
-    
     P=2^memory;
     %Secondary parameters
     Prod=floor(partProducer*nbrOfAgents); %Number of Producers
     
-    %AProd=sum(ones(Prod,P) - floor(rand(Prod,P)*2)*2);
-    %Random contribution to the A(t) variable by the producers Correct stat.
-    %distr. but not code efficient
+    %*********************************
+    %PRE-ALLOCATING STORED QUANTITIES
+    %*********************************
     
-    AProd=[-7 -4 -4 -3 -2 -1 0 0 0 0 1 2 3 4 4 7];
+    activeSpec = zeros(nbrOfTimeSteps,nbrOfRuns);
+    actions = zeros(nbrOfAgents-Prod,1);
+    A = zeros(nbrOfTimeSteps,nbrOfRuns);
+    bestStrat=zeros(nbrOfAgents-Prod,nbrOfTimeSteps);
+    clear agents
+    
+    AProd=[-2 -2 -2 -2 -1 -1 0 0 0 0 1 1 2 2 2 4];
     %Deterministic Producers for m=4
+    
+    %AProd=[(-P/2:1) (1:P/2)];
+    %AProd(1)=max(AProd)+2;
     
     for iRun=1:nbrOfRuns
         
+        %AProd=sum(ones(Prod,P) - floor(rand(Prod,P)*2)*2);
+        %store_Prod(iRun,:)=AProd;
+        %Random contribution to the A(t) variable by the producers Correct stat.
+        %distr. but not code efficient
+        storeHist=zeros(nbrOfTimeSteps,1);
+        
         %Resetting dynamic values
-        agents = CanonicalAgents(nbrOfAgents-Prod,memory,nbrOfStrategies);
+        agents = CanonicalAgents(nbrOfAgents-Prod,P,nbrOfStrategies);
         %storeAgree(iRun,1)=sum(sum((squeeze(agents(:,5,:)*AProd(5)>0)),2)==2)
-        points = zeros(nbrOfAgents-Prod, nbrOfStrategies);
+        points = ones(nbrOfAgents-Prod,1, nbrOfStrategies);
         %A separate matrix which corresponds to the agents' matrix
         
         for timeStep = 1:nbrOfTimeSteps
-            
-            histIndex = randi(P,1,1);
-            %Rand one of the 2^memory histories
-            
+            %Rand one of the P=2^memory histories
+            %Controlling when the extreme history comes (at index P) in
+            %order to control bubbles forming
+%             if (timeStep>8000 && max(bestStrat(:,timeStep-1))>40);
+%                 histIndex = randi(P-1,1,1);
+%             else
+                histIndex = randi(P,1,1);
+%             end
+%             
+            if(histIndex==P);
+                storeHist(timeStep)=1;
+            end
+%             
             %**********************
             % WHICH AGENTS WILL GO
             %**********************
@@ -77,17 +81,22 @@ for memory=4:4
             %With a possibility to abstain if the threshold of a
             %strategy is not met.
             
-            [Value,stratIndex] = max(points,[],2);
+            [Value,stratIndex] = max(points,[],3);
             %Pick most successfull strategy and it's corresp. point.
-            tempStrat=squeeze(agents(:,histIndex,:));
+            tempStrat=agents(:,histIndex,:);
             %Intermediate step because Matlab doeesn't do 3D-matrices well
             
             % actions=tempStrat(stratIndex).*Value>0;%
             %Jakobs finlösning: fungerar ej
             
-            ind=find(points(:,1)==points(:,2));
-            temp2=tempStrat(:,1).*(stratIndex==1)+tempStrat(:,2).*(stratIndex==2);
-            temp2(ind)=ones(length(ind),1)-floor(rand(length(ind),1)*2)*2;
+            %             ind=find(points(:,1)==points(:,2)); %Samuel hävdar att find inte behövs
+            %             temp2=tempStrat(:,1).*(stratIndex==1)+tempStrat(:,2).*(stratIndex==2);
+            %             temp2(ind)=ones(length(ind),1)-floor(rand(length(ind),1)*2)*2;
+            
+            ind=(points(:,1,1)==points(:,1,2));
+            temp2=tempStrat(:,1,1).*(stratIndex==1)+tempStrat(:,1,2).*(stratIndex==2);
+            temp2(ind)=ones(sum(ind),1)-floor(rand(sum(ind),1)*2)*2;
+            
             %Samuels fullösning: FUNGERAR.
             
             actions=temp2.*(Value>0);
@@ -104,62 +113,113 @@ for memory=4:4
             %STORE RESULTS
             %**************
             
-            A(timeStep,iRun)=sum(actions)+AProd(histIndex);
-            activeSpec(timeStep,iRun)=sum(abs(actions));
             
+            activeSpec(timeStep,iRun)=sum(abs(actions));
+            A(timeStep,iRun)=(sum(actions)+AProd(histIndex));%/(activeSpec(timeStep,iRun)+Prod);
             %**************
             % UPDATE SCORE
             %**************
             
-            points = points - tempStrat*A(timeStep,iRun)-epsilon;
-            %bestStrat(:,timeStep)=Value;
+            points = points(:,1,:) - tempStrat*((sum(actions)+AProd(histIndex)))-epsilon;
+            
+            bestStrat(:,timeStep)=Value;
             
         end % end timestep
         
     end
     
-    
-    
 end
+
+%%
+figure(1)
+clf
+plot(activeSpec,'-')
+hold on
+plot(storeHist*40,'k.')
+%
+figure(2)
+clf
+for i=1:nbrOfAgents-Prod
+    plot(bestStrat(i,:))
+    hold on
+end
+plot(linspace(0,nbrOfTimeSteps),-epsilon*linspace(0,nbrOfTimeSteps),'r--','LineWidth',1)
+plot(storeHist*80,'.k')
+set(gca,'FontSize',18)
+xlabel('Tidssteg')
+ylabel('Poäng')
+
+%%
+epsPhase=7000;
+bub=find(activeSpec(epsPhase:end)>40)+epsPhase;
+B1=diff(bub)>40;
+B1(1)=1;
+figure(3)
+clf
+plot(bub,'r+')
+hold on
+plot(bub(B1),'b*')
 
 %% *******************
 %PRICE AND LOGRETURNS
 %  *******************
-%Calculate price
+epsPhase=10000;
+stopp=nbrOfTimeSteps;
+
 price=1000*ones(nbrOfTimeSteps+1,1);
-lambda=1E5;
+lambda=4E3;
 for timeStep=1:nbrOfTimeSteps
     price(timeStep+1)=price(timeStep)*exp(A(timeStep)/lambda);
 end
 
 %Calculate log Returns
 dt=1;
-logReturn=log(price(dt+1:end)./price(1:end-dt));
+%logReturn=log((price(dt+1:end)-price(1:end-dt))./price(1:end-dt));
+%New logreturn that doesn't work
 
-start=1;
-stopp=nbrOfTimeSteps;
+%Return=log(price(dt+1:end)./price(1:end-dt));
+%NBins=100;
+Return=A(epsPhase:stopp,1)/lambda;
 
-figure(1)
-clf
-hold on
-title('LogReturns')
-xlabel('Time')
-plot(A(start:stopp))
+distrFit(Return,10000,'gauss1');
+
 
 figure(2)
 clf
-subplot(2,1,1)
-plot(activeSpec(start:stopp,1))
-title('Active Speculators')
-%hist(logReturn(1:end),500)
+plot(smooth(price(epsPhase:end),100))
 
-subplot(2,1,2)
-plot(price(start:stopp))
-title('Price')
-%%
+
+%% ****************
+%  Autocorrelation
+%  ****************
+clear corr
+maxLag=1000;
+epsPhase=10000;
+corr=autocorr(abs(A(epsPhase:end)),maxLag);
+corr=corr(2:end);
+x=(1:maxLag)';
+
+
+[powerCorr,gof]=fit((1:maxLag)',corr,'Power1');
+coeff=coeffvalues(powerCorr);
+%powerCoeff= coeffvalues(fit((1:maxLag)',corr,'Power1'));
+%expCoeff = coeffvalues(fit((1:maxLag)',corr,'Exp1'));
+
+
+%powerCorr=powerCoeff(1)*x.^powerCoeff(2);
+%expCorr=expCoeff(1)*exp(expCoeff(2)*x);
+
 figure(3)
 clf
-hist(price(1E4,end),10000)
+plot(powerCorr,x,corr)
+set(gca,'FontSize',16)
+title('Autocorrelated logReturn')
+legend(strcat('b=-',num2str(coeff(2))))
+%legend('Autocorr',strcat('ax^{b}, b=',num2str(powerCoeff(2))),strcat('ae^{bx}, b=',num2str(expCoeff(2))))
+%% Autocorrelation for different alpha
+
+
+
 %% ***************************
 %ALPHA_C scaled with N_spec.
 %***************************
@@ -183,25 +243,25 @@ hist(price(1E4,end),10000)
 %*******************************
 % ALPHA_C WITH FLOATING MEAN/STD
 %*******************************
-    timeInt=600;
-    A=A(6001:end);
-    nAct=zeros(length(A)/timeInt,1);
-    stdA=zeros(size(nAct));
+timeInt=600;
+A=A(6001:end);
+nAct=zeros(length(A)/timeInt,1);
+stdA=zeros(size(nAct));
 
-    for i=0:length(A)/timeInt-1
+for i=0:length(A)/timeInt-1
+    
+    ind1=i*timeInt+1;
+    ind2=(i+1)*timeInt;
+    
+    nAct(i+1)=mean(activeSpec(ind1:ind2))+Prod;
+    stdA(i+1)=std(abs(A(ind1:ind2)));
+    
+    %Perhaps avoid for-loop here with a cunning mean function
+    
+end
 
-        ind1=i*timeInt+1;
-        ind2=(i+1)*timeInt;
-
-        nAct(i+1)=mean(activeSpec(ind1:ind2))+Prod;
-        stdA(i+1)=std(abs(A(ind1:ind2)));
-
-        %Perhaps avoid for-loop here with a cunning mean function
-
-    end
-
-    alpa=[alpa; 2^memory./nAct/nbrOfAgents^(-0.65)];
-    sigmaScaled=[sigmaScaled; stdA.^2./nAct];
+alpa=[alpa; 2^memory./nAct/nbrOfAgents^(-0.65)];
+sigmaScaled=[sigmaScaled; stdA.^2./nAct];
 
 % Alpha_c, Weighted with activeSpec.
 
@@ -220,71 +280,22 @@ for i=1:nbrOfAgents-Prod
     hold on
 end
 
-%%
-phase=2;
-figure(2)
+
+%% *********
+%  PRICE GIF
+%  *********
+dt=10;
+I=nbrOfTimeSteps/dt;
+tStart=12000;
+
 clf
-plot(activeSpec(1:end))
-minim=min(activeSpec(phase:end))
-maxim=max(activeSpec(phase:end))
-%medel=mean(activeSpec(phase+5000:phase+7000))
-%P/medel
-
-
-%% *******************
-%PRICE AND LOGRETURNS
-%  *******************
-%Calculate price
-price=1000*ones(nbrOfTimeSteps+1,1);
-lambda=1E5;
-for timeStep=1:nbrOfTimeSteps
-    price(timeStep+1)=price(timeStep)*exp(A(timeStep)/lambda);
+for i=1:I
+    figure(1)
+    r=tStart+(i*dt:(i+1)*dt);
+    plot(r,price(r),'b-');
+    xlim([0 nbrOfTimeSteps-tStart])
+    ylim([500 1300])
+    hold on
+    pause(0.01)
 end
-
-%Calculate log Returns
-dt=1;
-logReturn=log(price(dt+1:end)./price(1:end-dt));
-
-start=1;
-stopp=30000;
-
-figure(1)
-clf
-hold on
-title('LogReturns')
-xlabel('Time')
-plot(A(start:stopp))
-
-figure(2)
-clf
-subplot(2,1,1)
-plot(activeSpec(start:stopp,1))
-title('Active Speculators')
-%hist(logReturn(1:end),500)
-
-subplot(2,1,2)
-plot(price(start:stopp))
-title('Price')
-%% ****************
-%  Autocorrelation
-%  ****************
-clear corr
-maxLag=300;
-corr=autocorr(abs(A(start:end)),maxLag);
-corr=corr(2:end);
-
-coeff= coeffvalues(fit((1:maxLag)',corr,'Power1'))
-x=linspace(1,maxLag);
-theorCorr=coeff(1)*x.^coeff(2);
-
-figure(3)
-clf
-hold on
-plot(x,theorCorr,'--')
-plot(corr,'o')
-title('Autocorrelated logReturn')
-% Corr is the vector of auto correlations.
-%loglog(corr,'o')
-
-
 
